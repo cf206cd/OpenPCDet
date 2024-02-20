@@ -57,15 +57,15 @@ class CustomDataset(DatasetTemplate):
         gt_names = []
         for line in lines:
             line_list = line.strip().split(' ')
-            gt_boxes.append(line_list[:-1])
-            gt_names.append(line_list[-1])
+            gt_names.append(line_list[0])
+            gt_boxes.append(line_list[1:])
 
-        return np.array(gt_boxes, dtype=np.float32), np.array(gt_names)
+        return np.array(gt_boxes, dtype=np.float32).reshape(-1,7), np.array(gt_names)
 
     def get_lidar(self, idx):
-        lidar_file = self.root_path / 'points' / ('%s.npy' % idx)
+        lidar_file = self.root_path / 'points' / ('%s.bin' % idx)
         assert lidar_file.exists()
-        point_features = np.load(lidar_file)
+        point_features =  np.fromfile(str(lidar_file), dtype=np.float32).reshape(-1, 4)
         return point_features
 
     def set_split(self, split):
@@ -192,7 +192,9 @@ class CustomDataset(DatasetTemplate):
 
             for i in range(num_obj):
                 filename = '%s_%s_%d.bin' % (sample_idx, names[i], i)
-                filepath = database_save_path / filename
+                savepath = database_save_path /sample_idx
+                savepath.mkdir(parents=True, exist_ok=True)
+                filepath = savepath/ filename
                 gt_points = points[point_indices[i] > 0]
 
                 gt_points[:, :3] -= gt_boxes[i, :3]
@@ -200,7 +202,7 @@ class CustomDataset(DatasetTemplate):
                     gt_points.tofile(f)
 
                 if (used_classes is None) or names[i] in used_classes:
-                    db_path = str(filepath.relative_to(self.root_path))  # gt_database/xxxxx.bin
+                    db_path = str(filepath.relative_to(self.root_path))  # gt_database/sample_idx/xxxxx.bin
                     db_info = {'name': names[i], 'path': db_path, 'gt_idx': i,
                                'box3d_lidar': gt_boxes[i], 'num_points_in_gt': gt_points.shape[0]}
                     if names[i] in all_db_infos:
@@ -274,10 +276,11 @@ if __name__ == '__main__':
         from easydict import EasyDict
 
         dataset_cfg = EasyDict(yaml.safe_load(open(sys.argv[2])))
-        ROOT_DIR = (Path(__file__).resolve().parent / '../../../').resolve()
+        ROOT_DIR = Path(dataset_cfg.DATA_PATH)
+        class_names = dataset_cfg.MAP_CLASS_TO_KITTI.keys()
         create_custom_infos(
             dataset_cfg=dataset_cfg,
-            class_names=['Vehicle', 'Pedestrian', 'Cyclist'],
-            data_path=ROOT_DIR / 'data' / 'custom',
-            save_path=ROOT_DIR / 'data' / 'custom',
+            class_names=class_names,
+            data_path=ROOT_DIR,
+            save_path=ROOT_DIR,
         )

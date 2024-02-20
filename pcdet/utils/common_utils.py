@@ -192,7 +192,6 @@ def init_dist_pytorch(tcp_port, local_rank, backend='nccl'):
     # os.environ['MASTER_PORT'] = str(tcp_port)
     # os.environ['MASTER_ADDR'] = 'localhost'
     num_gpus = torch.cuda.device_count()
-    torch.cuda.set_device(local_rank % num_gpus)
 
     dist.init_process_group(
         backend=backend,
@@ -201,6 +200,7 @@ def init_dist_pytorch(tcp_port, local_rank, backend='nccl'):
         # world_size=num_gpus
     )
     rank = dist.get_rank()
+    torch.cuda.set_device(rank % num_gpus)
     return num_gpus, rank
 
 
